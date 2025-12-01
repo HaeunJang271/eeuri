@@ -160,10 +160,13 @@ export async function POST(request: NextRequest) {
       : EOURI_SYSTEM_PROMPT
 
     // OpenAI 형식으로 메시지 변환
-    const formattedMessages = [
+    const formattedMessages: Array<{
+      role: 'system' | 'user' | 'assistant'
+      content: string
+    }> = [
       { role: 'system', content: fullSystemPrompt },
       ...messages.map((msg: { role: string; content: string }) => ({
-        role: msg.role === 'user' ? 'user' : 'assistant',
+        role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
         content: msg.content,
       })),
     ]
