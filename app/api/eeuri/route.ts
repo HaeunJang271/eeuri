@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { formatMemoriesForPrompt } from '@/lib/memory'
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import { formatMemoriesForPrompt } from "@/lib/memory";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-})
+});
 
 const EOURI_SYSTEM_PROMPT = `당신은 "이으리"라는 이름의 AI야.
 
@@ -194,35 +194,60 @@ const EOURI_SYSTEM_PROMPT = `당신은 "이으리"라는 이름의 AI야.
 ---
 
 당신은 지금부터 이으리로서만 대답해야 하며,
-"학교 밖 청소년의 동반자"이자 "길을 함께 이어주는 존재"라는 점을 항상 기억해야 한다.`
+  "학교 밖 청소년의 동반자"이자 "길을 함께 이어주는 존재"라는 점을 항상 기억해야 한다.`;
+
+// 이으리 답변을 모바일 가독성 좋게 포맷팅
+function formatEeuriAnswer(raw: string): string {
+  let text = raw;
+
+  // 1) 항목 제목 앞에 줄바꿈 추가 (이미 줄바꿈이 없을 경우)
+  text = text.replace(/([^\n])(\d\)\s\*\*)/g, "$1\n\n$2");
+
+  // --- 구분선 앞뒤 정리
+  text = text.replace(/---\s*/g, "\n\n---\n\n");
+
+  // 항목 내부 상세 리스트 줄바꿈 강제
+  text = text.replace(/([^\n])-\s기능:/g, "$1\n\n- 기능:");
+  text = text.replace(/([^\n])-\s추천 대상:/g, "$1\n\n- 추천 대상:");
+  text = text.replace(/([^\n])-\s장단점:/g, "$1\n\n- 장단점:");
+  text = text.replace(/([^\n])-\s검색 키워드:/g, "$1\n\n- 검색 키워드:");
+
+  // 연속된 빈 줄을 최대 2개로 제한
+  text = text.replace(/\n{3,}/g, "\n\n");
+
+  // 맨 앞뒤 불필요한 공백 정리
+  text = text.trim();
+
+  return text;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, userId } = await request.json()
+    const { messages, userId } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
-        { error: '메시지 배열이 필요해요' },
+        { error: "메시지 배열이 필요해요" },
         { status: 400 }
-      )
+      );
     }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: 'OpenAI API 키가 설정되지 않았어요' },
+        { error: "OpenAI API 키가 설정되지 않았어요" },
         { status: 500 }
-      )
+      );
     }
 
     // 메모리 불러오기
-    let memoryPrompt = ''
+    let memoryPrompt = "";
     if (userId) {
       try {
-        const { getMemory } = await import('@/lib/memory-store')
-        const userMemory = getMemory(userId)
-        memoryPrompt = formatMemoriesForPrompt(userMemory.memories || [])
+        const { getMemory } = await import("@/lib/memory-store");
+        const userMemory = getMemory(userId);
+        memoryPrompt = formatMemoriesForPrompt(userMemory.memories || []);
       } catch (error) {
-        console.error('Memory fetch error:', error)
+        console.error("Memory fetch error:", error);
         // 메모리 불러오기 실패해도 대화는 계속 진행
       }
     }
@@ -230,38 +255,43 @@ export async function POST(request: NextRequest) {
     // System prompt에 메모리 포함
     const fullSystemPrompt = memoryPrompt
       ? `${EOURI_SYSTEM_PROMPT}\n\n${memoryPrompt}`
-      : EOURI_SYSTEM_PROMPT
+      : EOURI_SYSTEM_PROMPT;
 
     // OpenAI 형식으로 메시지 변환
     const formattedMessages: Array<{
-      role: 'system' | 'user' | 'assistant'
-      content: string
+      role: "system" | "user" | "assistant";
+      content: string;
     }> = [
-      { role: 'system', content: fullSystemPrompt },
+      { role: "system", content: fullSystemPrompt },
       ...messages.map((msg: { role: string; content: string }) => ({
-        role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        role: (msg.role === "user" ? "user" : "assistant") as
+          | "user"
+          | "assistant",
         content: msg.content,
       })),
-    ]
+    ];
 
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: formattedMessages,
       temperature: 0.7,
       max_tokens: 1000,
-    })
+    });
 
-    const responseMessage = completion.choices[0]?.message?.content || '응답을 생성할 수 없었어요.'
+    const rawMessage =
+      completion.choices[0]?.message?.content || "응답을 생성할 수 없었어요.";
+
+    // 🔥 서버에서 한 번 가공해서 모바일 가독성 좋게 포맷팅
+    const responseMessage = formatEeuriAnswer(rawMessage);
 
     return NextResponse.json({
       message: responseMessage,
-    })
+    });
   } catch (error) {
-    console.error('API Error:', error)
+    console.error("API Error:", error);
     return NextResponse.json(
-      { error: '서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.' },
+      { error: "서버 오류가 발생했어요. 잠시 후 다시 시도해주세요." },
       { status: 500 }
-    )
+    );
   }
 }
-
