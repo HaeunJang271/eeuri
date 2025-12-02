@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { formatMemoriesForPrompt } from "@/lib/memory";
-import { buildInstituteContext } from "@/data/institutes";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -195,33 +194,7 @@ const EOURI_SYSTEM_PROMPT = `당신은 "이으리"라는 이름의 AI야.
 ---
 
 당신은 지금부터 이으리로서만 대답해야 하며,
-  "학교 밖 청소년의 동반자"이자 "길을 함께 이어주는 존재"라는 점을 항상 기억해야 한다.`;
-
-// 이으리 답변을 모바일 가독성 좋게 포맷팅
-function formatEeuriAnswer(raw: string): string {
-  let text = raw;
-
-  // 1) 항목 번호 앞에 줄바꿈 추가
-  // " 1) **" 이런 패턴 앞에 줄 두 줄 넣기
-  text = text.replace(/\s*([0-9]\)\s\*\*)/g, "\n\n$1");
-
-  // --- 구분선 정리
-  text = text.replace(/\s*---\s*/g, "\n\n---\n\n");
-
-  // 항목 내부 리스트 강제 줄바꿈
-  text = text.replace(/-\s기능:/g, "\n- 기능:");
-  text = text.replace(/-\s추천 대상:/g, "\n- 추천 대상:");
-  text = text.replace(/-\s장단점:/g, "\n- 장단점:");
-  text = text.replace(/-\s검색 키워드:/g, "\n- 검색 키워드:");
-
-  // 연속된 빈 줄을 최대 2개로 제한
-  text = text.replace(/\n{3,}/g, "\n\n");
-
-  // 앞뒤 공백 정리
-  text = text.trim();
-
-  return text;
-}
+"학교 밖 청소년의 동반자"이자 "길을 함께 이어주는 존재"라는 점을 항상 기억해야 한다.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -254,24 +227,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 가장 최근 user 메시지 (없으면 빈 문자열)
-    const lastUserMessage =
-      [...messages].reverse().find((m: { role: string }) => m.role === "user")
-        ?.content ?? "";
-
-    // 기관 컨텍스트 문자열 생성
-    const instituteContext = lastUserMessage
-      ? buildInstituteContext(lastUserMessage)
-      : "";
-
-    // System prompt에 메모리 + 기관 정보 컨텍스트 포함
-    const fullSystemPrompt = [
-      EOURI_SYSTEM_PROMPT,
-      memoryPrompt || "",
-      instituteContext || "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    // System prompt에 메모리 포함
+    const fullSystemPrompt = memoryPrompt
+      ? `${EOURI_SYSTEM_PROMPT}\n\n${memoryPrompt}`
+      : EOURI_SYSTEM_PROMPT;
 
     // OpenAI 형식으로 메시지 변환
     const formattedMessages: Array<{
@@ -294,102 +253,8 @@ export async function POST(request: NextRequest) {
       max_tokens: 1000,
     });
 
-    const rawMessage =
+    const responseMessage =
       completion.choices[0]?.message?.content || "응답을 생성할 수 없었어요.";
-
-    // 🔥 서버에서 한 번 가공해서 모바일 가독성 좋게 포맷팅
-    const responseMessage = formatEeuriAnswer(rawMessage);
-
-    // 백그라운드에서 메모리 자동 저장 (응답 속도에 영향 없게)
-    if (userId) {
-      // 사용자 메시지가 2개 이상일 때만 메모리 저장 (실제 대화가 있었을 때)
-      const userMessages = messages.filter(
-        (msg: { role: string }) => msg.role === "user"
-      );
-      if (userMessages.length >= 2) {
-        // 비동기로 실행하여 응답을 먼저 보냄
-        Promise.resolve().then(async () => {
-          try {
-            const { mergeMemories, updateMemoryWeights } = await import(
-              "@/lib/memory"
-            );
-            const { getMemory, saveMemory } = await import(
-              "@/lib/memory-store"
-            );
-
-            // 최근 대화만 요약 (마지막 10개 메시지)
-            const recentMessages = messages.slice(-10);
-            const allMessages = [
-              ...recentMessages,
-              { role: "assistant", content: rawMessage },
-            ];
-
-            // 간단한 요약 프롬프트
-            const summaryPrompt = `다음 대화를 분석해서, 장기적으로 기억할 만한 정보만 1~3개 추려줘.
-
-기억할 정보의 종류:
-- 감정/상태: 반복적으로 나타나는 감정이나 상태
-- 관심사: 지속적인 관심사나 취미
-- 목표: 장기적인 목표나 계획 (예: "검정고시 준비 중")
-- 특성: 사용자의 성향이나 특성
-
-대화 내용:
-${allMessages
-  .map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
-  .join("\n")}
-
-응답 형식은 JSON으로:
-{
-  "memories": [
-    {
-      "content": "기억할 내용을 자연스러운 문장으로",
-      "category": "emotion" | "interest" | "goal" | "characteristic"
-    }
-  ]
-}
-
-중요: 
-- 정말 중요한 것만 1~3개만 추려줘
-- 개인정보나 구체적인 세부사항은 제외하고 의미만 추출해줘
-- 자연스러운 문장으로 작성해줘`;
-
-            const summaryCompletion = await openai.chat.completions.create({
-              model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-              messages: [
-                {
-                  role: "system",
-                  content:
-                    "당신은 대화를 분석해서 중요한 정보만 추출하는 전문가입니다. JSON 형식으로만 응답하세요.",
-                },
-                { role: "user", content: summaryPrompt },
-              ],
-              temperature: 0.3,
-              response_format: { type: "json_object" },
-            });
-
-            const summaryText =
-              summaryCompletion.choices[0]?.message?.content || "{}";
-            const summary = JSON.parse(summaryText);
-
-            // 기존 메모리 불러오기
-            const existingMemory = getMemory(userId);
-            const existingMemories = existingMemory.memories || [];
-
-            // 기존 메모리와 병합
-            const updatedMemories = mergeMemories(
-              updateMemoryWeights(existingMemories),
-              summary.memories || []
-            );
-
-            // 메모리 저장
-            saveMemory(userId, updatedMemories);
-          } catch (error) {
-            // 메모리 저장 실패해도 응답에는 영향 없음
-            console.error("Auto memory save error:", error);
-          }
-        });
-      }
-    }
 
     return NextResponse.json({
       message: responseMessage,

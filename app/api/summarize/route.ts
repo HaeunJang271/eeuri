@@ -11,14 +11,17 @@ export async function POST(req: NextRequest) {
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
-        { error: "messages 배열이 필요해요." },
+        { error: "메시지를 제대로 받지 못한 것 같아. 다시 보내볼래?" },
         { status: 400 }
       );
     }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "OpenAI API 키가 설정되지 않았어요" },
+        {
+          error:
+            "지금은 내가 잘 연결이 안 되는 것 같아… 잠깐 뒤에 다시 시도해볼래?",
+        },
         { status: 500 }
       );
     }
@@ -87,7 +90,7 @@ ${conversationText}`;
   } catch (error) {
     console.error("Summarize API error:", error);
     return NextResponse.json(
-      { error: "요약 중 서버 오류가 발생했어요." },
+      { error: "요약하는 중에 뭔가 꼬인 것 같아. 잠시 뒤에 다시 해볼래?" },
       { status: 500 }
     );
   }

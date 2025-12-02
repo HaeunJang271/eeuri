@@ -1,8 +1,4 @@
-export type SupportIntent =
-  | "검정고시"
-  | "진로"
-  | "멘탈"
-  | "학교밖전반";
+export type SupportIntent = "검정고시" | "진로" | "멘탈" | "학교밖전반";
 
 type InstituteType =
   | "꿈드림"
@@ -89,7 +85,8 @@ export const INSTITUTES: InstituteInfo[] = [
     forWho: "집-혼자만 반복되는 패턴이 답답한 사람, 새로운 자극이 필요한 사람.",
     pros: "무료 또는 저렴하게 이용 가능하고, 프로그램이나 동아리도 있을 수 있어.",
     cons: "직접 찾아보고, 마음에 드는 공간을 찾는 데 시간이 필요할 수 있어.",
-    exampleSearch: '네가 사는 동네 이름 + "청소년 문화의 집", "청소년 문화공간"',
+    exampleSearch:
+      '네가 사는 동네 이름 + "청소년 문화의 집", "청소년 문화공간"',
   },
 ];
 
@@ -99,7 +96,11 @@ export function detectSupportIntent(text: string): SupportIntent[] {
 
   const intents: SupportIntent[] = [];
 
-  if (lower.includes("검정고시") || lower.includes("독학") || lower.includes("시험")) {
+  if (
+    lower.includes("검정고시") ||
+    lower.includes("독학") ||
+    lower.includes("시험")
+  ) {
     intents.push("검정고시");
   }
 
@@ -145,12 +146,16 @@ export function getInstitutesForIntent(intent: SupportIntent): InstituteInfo[] {
   switch (intent) {
     case "검정고시":
       return INSTITUTES.filter((i) =>
-        ["꿈드림", "검정고시학원", "온라인강의", "청소년상담복지센터"].includes(i.type)
+        ["꿈드림", "검정고시학원", "온라인강의", "청소년상담복지센터"].includes(
+          i.type
+        )
       );
 
     case "진로":
       return INSTITUTES.filter((i) =>
-        ["꿈드림", "직업훈련", "문화공간", "청소년상담복지센터"].includes(i.type)
+        ["꿈드림", "직업훈련", "문화공간", "청소년상담복지센터"].includes(
+          i.type
+        )
       );
 
     case "멘탈":
@@ -181,9 +186,13 @@ export function buildInstituteContext(userText: string): string {
 
   const lines: string[] = [];
 
-  lines.push("아래는 한국에서 학교 밖 청소년이 이용할 수 있는 대표적인 지원 유형이야.");
+  lines.push(
+    "아래는 한국에서 학교 밖 청소년이 이용할 수 있는 대표적인 지원 유형이야."
+  );
   lines.push("정확한 기관 이름과 연락처는 사용자의 지역에 따라 다를 수 있어.");
-  lines.push("너는 아래 정보를 참고해서, 기관/학원/상담 센터를 '유형 + 검색 키워드' 중심으로 추천해줘.");
+  lines.push(
+    "너는 아래 정보를 참고해서, 기관/학원/상담 센터를 '유형 + 검색 키워드' 중심으로 추천해줘."
+  );
   lines.push("");
 
   picked.forEach((inst, index) => {
@@ -204,4 +213,3 @@ export function buildInstituteContext(userText: string): string {
 
   return lines.join("\n");
 }
-

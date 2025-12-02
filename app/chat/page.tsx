@@ -28,89 +28,31 @@ function getOrCreateUserId(): string {
   return userId;
 }
 
-// LocalStorage에서 메시지 불러오기
-function loadMessagesFromStorage(userId: string): Message[] {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const saved = localStorage.getItem(`eeuri_messages_${userId}`);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // 유효한 메시지 배열인지 확인
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (error) {
-    console.error("Failed to load messages from storage:", error);
-  }
-
-  // 기본 인사 메시지
-  return [
+export default function ChatPage() {
+  const [userId] = useState(() => getOrCreateUserId());
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
         '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?\n\n💡 팁: 대화를 나눈 후 "/요약"이라고 입력하면 오늘 대화를 정리해줄게.',
     },
-  ];
-}
-
-// LocalStorage에 메시지 저장
-function saveMessagesToStorage(userId: string, messages: Message[]) {
-  if (typeof window === "undefined") return;
-
-  try {
-    localStorage.setItem(`eeuri_messages_${userId}`, JSON.stringify(messages));
-  } catch (error) {
-    console.error("Failed to save messages to storage:", error);
-  }
-}
-
-// 기본 인사 메시지
-const DEFAULT_MESSAGE: Message = {
-  role: "assistant",
-  content:
-    '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?\n\n💡 팁: 대화를 나눈 후 "/요약"이라고 입력하면 오늘 대화를 정리해줄게.',
-};
-
-export default function ChatPage() {
-  const [userId] = useState(() => getOrCreateUserId());
-  // 초기 상태는 빈 배열로 시작 (서버와 클라이언트 일치)
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // 클라이언트에서만 LocalStorage에서 메시지 불러오기
   useEffect(() => {
-    if (!isLoaded) {
-      const loadedMessages = loadMessagesFromStorage(userId);
-      setMessages(loadedMessages);
-      setIsLoaded(true);
-    }
-  }, [userId, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      scrollToBottom();
-    }
-  }, [messages, isLoaded]);
-
-  // 메시지가 변경될 때마다 LocalStorage에 저장 (로드 완료 후에만)
-  useEffect(() => {
-    if (isLoaded && messages.length > 0) {
-      saveMessagesToStorage(userId, messages);
-    }
-  }, [messages, userId, isLoaded]);
+    scrollToBottom();
+  }, [messages]);
 
   // 페이지를 떠날 때 대화 요약 저장
   useEffect(() => {
@@ -145,71 +87,15 @@ export default function ChatPage() {
     setShowAutocomplete(value === "/");
   };
 
-  const handleAutocompleteClick = () => {
-    setInput("/요약");
+  const handleAutocompleteClick = (command: string) => {
+    setInput(command);
     setShowAutocomplete(false);
-    // 자동으로 요약 실행 후 입력창 비우기
-    setTimeout(() => {
-      handleSummarize();
-      setInput(""); // 요약 실행 후 입력창 비우기
-    }, 100);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading || summarizing) return;
-
-    const userMessage = input.trim();
-    setInput("");
-    setShowAutocomplete(false);
-
-    // "/요약" 명령어 처리 - 메시지 목록에 추가하지 않고 바로 요약 실행
-    const normalizedMessage = userMessage.toLowerCase().replace(/\s+/g, "");
-    if (
-      normalizedMessage === "/요약" ||
-      normalizedMessage === "/요약해줘" ||
-      normalizedMessage.startsWith("/요약")
-    ) {
-      await handleSummarize();
-      return; // 메시지 목록에 추가하지 않음
-    }
-
-    // 일반 메시지는 메시지 목록에 추가
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/eeuri", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [...messages, { role: "user", content: userMessage }],
-          userId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("응답을 받아오는데 실패했어요");
-      }
-
-      const data = await response.json();
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: data.message },
-      ]);
-    } catch (error) {
-      console.error("Error:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "죄송해요, 잠시 문제가 생긴 것 같아요. 다시 시도해볼까요?",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
+    // "/요약"인 경우 자동으로 요약 실행
+    if (command === "/요약") {
+      setTimeout(() => {
+        handleSummarize();
+        setInput(""); // 요약 실행 후 입력창 비우기
+      }, 100);
     }
   };
 
@@ -258,13 +144,130 @@ export default function ChatPage() {
       setSummary(data.summary as Summary);
     } catch (err: any) {
       console.error("Summarize error:", err);
-      setSummaryError(
-        err.message || "요약 도중 오류가 발생했어. 잠시 후 다시 시도해줘."
-      );
+      // 에러 메시지가 이미 이으리 말투인지 확인하고, 아니면 변환
+      let errorMessage =
+        err.message ||
+        "요약하는 중에 뭔가 꼬인 것 같아. 잠시 뒤에 다시 해볼래?";
+      // 서버에서 온 에러 메시지도 이으리 말투로 변환
+      if (
+        errorMessage.includes("서버 오류") ||
+        errorMessage.includes("오류가 발생")
+      ) {
+        errorMessage =
+          "요약하는 중에 뭔가 꼬인 것 같아. 잠시 뒤에 다시 해볼래?";
+      } else if (
+        errorMessage.includes("문제가 발생") ||
+        errorMessage.includes("요약 중")
+      ) {
+        errorMessage =
+          "요약하는 중에 뭔가 꼬인 것 같아. 잠시 뒤에 다시 해볼래?";
+      }
+      setSummaryError(errorMessage);
     } finally {
       setSummarizing(false);
     }
   }
+
+  const handleResetConfirm = () => {
+    // localStorage에서 메시지 삭제
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(`eeuri_messages_${userId}`);
+    }
+    // 메시지를 기본 인사 메시지만 남기기
+    const defaultMessage: Message = {
+      role: "assistant",
+      content:
+        '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?\n\n💡 팁: 대화를 나눈 후 "/요약"이라고 입력하면 오늘 대화를 정리해줄게.',
+    };
+    setMessages([defaultMessage]);
+    // summary 초기화
+    setSummary(null);
+    setSummaryError(null);
+    // 모달 닫기
+    setShowResetModal(false);
+  };
+
+  const handleResetCancel = () => {
+    setShowResetModal(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = input.trim();
+    setInput("");
+    setShowAutocomplete(false);
+
+    // "/요약" 명령어 처리 - 메시지 목록에 추가하지 않고 바로 요약 실행
+    const normalizedMessage = userMessage.toLowerCase().replace(/\s+/g, "");
+    if (
+      normalizedMessage === "/요약" ||
+      normalizedMessage === "/요약해줘" ||
+      normalizedMessage.startsWith("/요약")
+    ) {
+      await handleSummarize();
+      return; // 메시지 목록에 추가하지 않음
+    }
+
+    // "/리셋" 명령어 처리 - 대화 초기화
+    if (normalizedMessage === "/리셋" || normalizedMessage === "/reset") {
+      setShowResetModal(true);
+      return; // 메시지 목록에 추가하지 않음
+    }
+
+    // 일반 메시지는 메시지 목록에 추가
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/eeuri", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [...messages, { role: "user", content: userMessage }],
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("응답을 받아오는데 실패했어요");
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // 서버에서 온 에러 메시지가 있으면 그대로 사용 (이미 이으리 말투)
+        const errorMessage =
+          data?.error ||
+          "지금은 내가 잘 연결이 안 되는 것 같아… 잠깐 뒤에 다시 시도해볼래?";
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: errorMessage },
+        ]);
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.message },
+      ]);
+    } catch (error) {
+      console.error("Error:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "지금은 내가 잘 연결이 안 되는 것 같아… 잠깐 뒤에 다시 시도해볼래?",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className={styles.chatContainer}>
@@ -293,8 +296,13 @@ export default function ChatPage() {
         ))}
         {isLoading && (
           <div className={`${styles.message} ${styles.assistant}`}>
-            <div className={styles.messageContent}>
-              <span className={styles.typing}>이으리가 생각 중...</span>
+            <div className={`${styles.messageContent} ${styles.loadingMessage}`}>
+              <div className={styles.loadingSkeleton}>
+                <div className={styles.skeletonLine} style={{ width: "80%" }}></div>
+                <div className={styles.skeletonLine} style={{ width: "60%" }}></div>
+                <div className={styles.skeletonLine} style={{ width: "70%" }}></div>
+              </div>
+              <span className={styles.typing}>생각 중…</span>
             </div>
           </div>
         )}
@@ -385,13 +393,21 @@ export default function ChatPage() {
             <div className={styles.autocomplete}>
               <button
                 type="button"
-                onClick={handleAutocompleteClick}
+                onClick={() => handleAutocompleteClick("/요약")}
                 className={styles.autocompleteItem}
               >
                 <span className={styles.autocompleteCommand}>/요약</span>
                 <span className={styles.autocompleteDesc}>
                   오늘 대화 요약하기
                 </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAutocompleteClick("/리셋")}
+                className={styles.autocompleteItem}
+              >
+                <span className={styles.autocompleteCommand}>/리셋</span>
+                <span className={styles.autocompleteDesc}>대화 초기화하기</span>
               </button>
             </div>
           )}
@@ -404,6 +420,44 @@ export default function ChatPage() {
           전송
         </button>
       </form>
+
+      {/* 리셋 확인 모달 */}
+      {showResetModal && (
+        <div className={styles.modalOverlay} onClick={handleResetCancel}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>대화 초기화</h2>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.modalMessage}>
+                다시 처음부터 이야기해볼까?
+              </p>
+              <p className={styles.modalSubMessage}>
+                지금까지 나눈 대화가 모두 삭제돼요.
+              </p>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                onClick={handleResetCancel}
+                className={styles.modalButtonCancel}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleResetConfirm}
+                className={styles.modalButtonConfirm}
+              >
+                초기화하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
