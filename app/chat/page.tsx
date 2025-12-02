@@ -148,9 +148,10 @@ export default function ChatPage() {
   const handleAutocompleteClick = () => {
     setInput("/요약");
     setShowAutocomplete(false);
-    // 자동으로 요약 실행
+    // 자동으로 요약 실행 후 입력창 비우기
     setTimeout(() => {
       handleSummarize();
+      setInput(""); // 요약 실행 후 입력창 비우기
     }, 100);
   };
 
