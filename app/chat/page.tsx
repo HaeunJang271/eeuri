@@ -21,14 +21,54 @@ function getOrCreateUserId(): string {
   return userId
 }
 
-export default function ChatPage() {
-  const [userId] = useState(() => getOrCreateUserId())
-  const [messages, setMessages] = useState<Message[]>([
+// LocalStorage에서 메시지 불러오기
+function loadMessagesFromStorage(userId: string): Message[] {
+  if (typeof window === 'undefined') return []
+  
+  try {
+    const saved = localStorage.getItem(`eeuri_messages_${userId}`)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // 유효한 메시지 배열인지 확인
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load messages from storage:', error)
+  }
+  
+  // 기본 인사 메시지
+  return [
     {
       role: 'assistant',
       content: '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?'
     }
-  ])
+  ]
+}
+
+// LocalStorage에 메시지 저장
+function saveMessagesToStorage(userId: string, messages: Message[]) {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem(`eeuri_messages_${userId}`, JSON.stringify(messages))
+  } catch (error) {
+    console.error('Failed to save messages to storage:', error)
+  }
+}
+
+// 기본 인사 메시지
+const DEFAULT_MESSAGE: Message = {
+  role: 'assistant',
+  content: '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?'
+}
+
+export default function ChatPage() {
+  const [userId] = useState(() => getOrCreateUserId())
+  // 초기 상태는 빈 배열로 시작 (서버와 클라이언트 일치)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -37,9 +77,27 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // 클라이언트에서만 LocalStorage에서 메시지 불러오기
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (!isLoaded) {
+      const loadedMessages = loadMessagesFromStorage(userId)
+      setMessages(loadedMessages)
+      setIsLoaded(true)
+    }
+  }, [userId, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded) {
+      scrollToBottom()
+    }
+  }, [messages, isLoaded])
+
+  // 메시지가 변경될 때마다 LocalStorage에 저장 (로드 완료 후에만)
+  useEffect(() => {
+    if (isLoaded && messages.length > 0) {
+      saveMessagesToStorage(userId, messages)
+    }
+  }, [messages, userId, isLoaded])
 
   // 페이지를 떠날 때 대화 요약 저장
   useEffect(() => {

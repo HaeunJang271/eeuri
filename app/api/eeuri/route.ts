@@ -285,6 +285,97 @@ export async function POST(request: NextRequest) {
     // 🔥 서버에서 한 번 가공해서 모바일 가독성 좋게 포맷팅
     const responseMessage = formatEeuriAnswer(rawMessage);
 
+    // 백그라운드에서 메모리 자동 저장 (응답 속도에 영향 없게)
+    if (userId) {
+      // 사용자 메시지가 2개 이상일 때만 메모리 저장 (실제 대화가 있었을 때)
+      const userMessages = messages.filter(
+        (msg: { role: string }) => msg.role === "user"
+      );
+      if (userMessages.length >= 2) {
+        // 비동기로 실행하여 응답을 먼저 보냄
+        Promise.resolve().then(async () => {
+          try {
+            const { mergeMemories, updateMemoryWeights } = await import(
+              "@/lib/memory"
+            );
+            const { getMemory, saveMemory } = await import(
+              "@/lib/memory-store"
+            );
+
+            // 최근 대화만 요약 (마지막 10개 메시지)
+            const recentMessages = messages.slice(-10);
+            const allMessages = [
+              ...recentMessages,
+              { role: "assistant", content: rawMessage },
+            ];
+
+            // 간단한 요약 프롬프트
+            const summaryPrompt = `다음 대화를 분석해서, 장기적으로 기억할 만한 정보만 1~3개 추려줘.
+
+기억할 정보의 종류:
+- 감정/상태: 반복적으로 나타나는 감정이나 상태
+- 관심사: 지속적인 관심사나 취미
+- 목표: 장기적인 목표나 계획 (예: "검정고시 준비 중")
+- 특성: 사용자의 성향이나 특성
+
+대화 내용:
+${allMessages
+  .map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
+  .join("\n")}
+
+응답 형식은 JSON으로:
+{
+  "memories": [
+    {
+      "content": "기억할 내용을 자연스러운 문장으로",
+      "category": "emotion" | "interest" | "goal" | "characteristic"
+    }
+  ]
+}
+
+중요: 
+- 정말 중요한 것만 1~3개만 추려줘
+- 개인정보나 구체적인 세부사항은 제외하고 의미만 추출해줘
+- 자연스러운 문장으로 작성해줘`;
+
+            const summaryCompletion = await openai.chat.completions.create({
+              model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "당신은 대화를 분석해서 중요한 정보만 추출하는 전문가입니다. JSON 형식으로만 응답하세요.",
+                },
+                { role: "user", content: summaryPrompt },
+              ],
+              temperature: 0.3,
+              response_format: { type: "json_object" },
+            });
+
+            const summaryText =
+              summaryCompletion.choices[0]?.message?.content || "{}";
+            const summary = JSON.parse(summaryText);
+
+            // 기존 메모리 불러오기
+            const existingMemory = getMemory(userId);
+            const existingMemories = existingMemory.memories || [];
+
+            // 기존 메모리와 병합
+            const updatedMemories = mergeMemories(
+              updateMemoryWeights(existingMemories),
+              summary.memories || []
+            );
+
+            // 메모리 저장
+            saveMemory(userId, updatedMemories);
+          } catch (error) {
+            // 메모리 저장 실패해도 응답에는 영향 없음
+            console.error("Auto memory save error:", error);
+          }
+        });
+      }
+    }
+
     return NextResponse.json({
       message: responseMessage,
     });
