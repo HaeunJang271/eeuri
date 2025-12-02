@@ -82,6 +82,7 @@
   border-radius: 12px;
   line-height: 1.6;
   word-wrap: break-word;
+  white-space: pre-line;
 }
 
 .message.user .messageContent {

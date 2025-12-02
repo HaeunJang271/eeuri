@@ -200,22 +200,23 @@ const EOURI_SYSTEM_PROMPT = `당신은 "이으리"라는 이름의 AI야.
 function formatEeuriAnswer(raw: string): string {
   let text = raw;
 
-  // 1) 항목 제목 앞에 줄바꿈 추가 (이미 줄바꿈이 없을 경우)
-  text = text.replace(/([^\n])(\d\)\s\*\*)/g, "$1\n\n$2");
+  // 1) 항목 번호 앞에 줄바꿈 추가
+  // " 1) **" 이런 패턴 앞에 줄 두 줄 넣기
+  text = text.replace(/\s*([0-9]\)\s\*\*)/g, "\n\n$1");
 
-  // --- 구분선 앞뒤 정리
-  text = text.replace(/---\s*/g, "\n\n---\n\n");
+  // --- 구분선 정리
+  text = text.replace(/\s*---\s*/g, "\n\n---\n\n");
 
-  // 항목 내부 상세 리스트 줄바꿈 강제
-  text = text.replace(/([^\n])-\s기능:/g, "$1\n\n- 기능:");
-  text = text.replace(/([^\n])-\s추천 대상:/g, "$1\n\n- 추천 대상:");
-  text = text.replace(/([^\n])-\s장단점:/g, "$1\n\n- 장단점:");
-  text = text.replace(/([^\n])-\s검색 키워드:/g, "$1\n\n- 검색 키워드:");
+  // 항목 내부 리스트 강제 줄바꿈
+  text = text.replace(/-\s기능:/g, "\n- 기능:");
+  text = text.replace(/-\s추천 대상:/g, "\n- 추천 대상:");
+  text = text.replace(/-\s장단점:/g, "\n- 장단점:");
+  text = text.replace(/-\s검색 키워드:/g, "\n- 검색 키워드:");
 
   // 연속된 빈 줄을 최대 2개로 제한
   text = text.replace(/\n{3,}/g, "\n\n");
 
-  // 맨 앞뒤 불필요한 공백 정리
+  // 앞뒤 공백 정리
   text = text.trim();
 
   return text;
