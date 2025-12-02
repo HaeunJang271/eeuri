@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { formatMemoriesForPrompt } from "@/lib/memory";
+import { buildInstituteContext } from "@/data/institutes";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -253,10 +254,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // System prompt에 메모리 포함
-    const fullSystemPrompt = memoryPrompt
-      ? `${EOURI_SYSTEM_PROMPT}\n\n${memoryPrompt}`
-      : EOURI_SYSTEM_PROMPT;
+    // 가장 최근 user 메시지 (없으면 빈 문자열)
+    const lastUserMessage =
+      [...messages].reverse().find((m: { role: string }) => m.role === "user")
+        ?.content ?? "";
+
+    // 기관 컨텍스트 문자열 생성
+    const instituteContext = lastUserMessage
+      ? buildInstituteContext(lastUserMessage)
+      : "";
+
+    // System prompt에 메모리 + 기관 정보 컨텍스트 포함
+    const fullSystemPrompt = [
+      EOURI_SYSTEM_PROMPT,
+      memoryPrompt || "",
+      instituteContext || "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     // OpenAI 형식으로 메시지 변환
     const formattedMessages: Array<{
