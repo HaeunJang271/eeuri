@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
-const inputPath = path.join(__dirname, '../public/imgs/logo.png');
+const inputPath = path.join(__dirname, '../public/imgs/icon.png');
 const outputDir = path.join(__dirname, '../public/icons');
 
 // Ensure output directory exists
