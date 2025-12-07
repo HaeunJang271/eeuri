@@ -63,6 +63,7 @@ export default function ChatPage() {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -70,20 +71,21 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // 초기 로드 시 localStorage에서 메시지 불러오기
+  // 클라이언트에서만 localStorage에서 메시지 불러오기
   useEffect(() => {
     if (userId) {
       const savedMessages = loadMessages(userId);
       setMessages(savedMessages);
+      setIsLoaded(true);
     }
   }, [userId]);
 
-  // 메시지 변경 시 localStorage에 저장
+  // 메시지 변경 시 localStorage에 저장 (로드 완료 후에만)
   useEffect(() => {
-    if (userId && messages.length > 0) {
+    if (isLoaded && userId && messages.length > 0) {
       localStorage.setItem(`eeuri_messages_${userId}`, JSON.stringify(messages));
     }
-  }, [userId, messages]);
+  }, [userId, messages, isLoaded]);
 
   useEffect(() => {
     scrollToBottom();
