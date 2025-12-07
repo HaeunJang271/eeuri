@@ -64,6 +64,8 @@ export default function ChatPage() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [typingMessage, setTypingMessage] = useState<string | null>(null);
+  const [displayedText, setDisplayedText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -87,9 +89,47 @@ export default function ChatPage() {
     }
   }, [userId, messages, isLoaded]);
 
+  // 타이핑 애니메이션 효과
+  useEffect(() => {
+    if (typingMessage === null) return;
+
+    let currentIndex = 0;
+    let isCancelled = false;
+
+    const typeNextChars = () => {
+      if (isCancelled) return;
+      
+      if (currentIndex < typingMessage.length) {
+        // 한 번에 여러 글자씩 표시 (더 빠른 타이핑)
+        const charsToAdd = Math.min(3, typingMessage.length - currentIndex);
+        currentIndex += charsToAdd;
+        setDisplayedText(typingMessage.slice(0, currentIndex));
+        setTimeout(typeNextChars, 15);
+      } else {
+        // 타이핑 완료 후 메시지 목록에 추가
+        setTimeout(() => {
+          if (isCancelled) return;
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: typingMessage },
+          ]);
+          setTypingMessage(null);
+          setDisplayedText("");
+        }, 100);
+      }
+    };
+
+    setDisplayedText("");
+    setTimeout(typeNextChars, 50);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [typingMessage]);
+
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, displayedText]);
 
   // 페이지를 떠날 때 대화 요약 저장
   useEffect(() => {
@@ -285,29 +325,19 @@ export default function ChatPage() {
         const errorMessage =
           data?.error ||
           "지금은 내가 잘 연결이 안 되는 것 같아… 잠깐 뒤에 다시 시도해볼래?";
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: errorMessage },
-        ]);
+        setIsLoading(false);
+        setTypingMessage(errorMessage);
         return;
       }
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: data.message },
-      ]);
+      setIsLoading(false);
+      setTypingMessage(data.message);
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "지금은 내가 잘 연결이 안 되는 것 같아… 잠깐 뒤에 다시 시도해볼래?",
-        },
-      ]);
-    } finally {
       setIsLoading(false);
+      setTypingMessage(
+        "지금은 내가 잘 연결이 안 되는 것 같아… 잠깐 뒤에 다시 시도해볼래?"
+      );
     }
   };
 
@@ -348,6 +378,15 @@ export default function ChatPage() {
           <div className={`${styles.message} ${styles.assistant}`}>
             <div className={styles.messageContent}>
               <span className={styles.typing}>이으리가 생각 중..</span>
+            </div>
+          </div>
+        )}
+        {typingMessage !== null && displayedText && (
+          <div className={`${styles.message} ${styles.assistant}`}>
+            <div className={styles.messageContent}>
+              <div className={styles.markdown}>
+                {displayedText}
+              </div>
             </div>
           </div>
         )}
@@ -454,12 +493,12 @@ export default function ChatPage() {
             }}
             placeholder="메시지를 입력하세요..."
             className={styles.input}
-            disabled={isLoading || summarizing}
+            disabled={isLoading || summarizing || typingMessage !== null}
             rows={1}
           />
           <button
             type="submit"
-            disabled={isLoading || summarizing || !input.trim()}
+            disabled={isLoading || summarizing || typingMessage !== null || !input.trim()}
             className={styles.sendButton}
           >
             전송
