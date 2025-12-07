@@ -2,19 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 import styles from "./page.module.css";
-
-// **텍스트**를 굵은 글씨로 변환하는 함수
-function formatBoldText(text: string): React.ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      const boldText = part.slice(2, -2);
-      return <strong key={index}>{boldText}</strong>;
-    }
-    return part;
-  });
-}
 
 interface Message {
   role: "user" | "assistant";
@@ -304,9 +293,13 @@ export default function ChatPage() {
             className={`${styles.message} ${styles[message.role]}`}
           >
             <div className={styles.messageContent}>
-              {message.role === "assistant"
-                ? formatBoldText(message.content)
-                : message.content}
+              {message.role === "assistant" ? (
+                <div className={styles.markdown}>
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                </div>
+              ) : (
+                message.content
+              )}
             </div>
           </div>
         ))}
