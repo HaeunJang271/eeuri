@@ -46,6 +46,7 @@ export default function ChatPage() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -81,11 +82,16 @@ export default function ChatPage() {
     };
   }, [userId, messages]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInput(value);
     // "/" 입력 시 자동완성 표시
     setShowAutocomplete(value === "/");
+    
+    // textarea 높이 자동 조절
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   };
 
   const handleAutocompleteClick = (command: string) => {
@@ -199,6 +205,11 @@ export default function ChatPage() {
     const userMessage = input.trim();
     setInput("");
     setShowAutocomplete(false);
+    
+    // textarea 높이 초기화
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
 
     // "/요약" 명령어 처리 - 메시지 목록에 추가하지 않고 바로 요약 실행
     const normalizedMessage = userMessage.toLowerCase().replace(/\s+/g, "");
@@ -378,9 +389,31 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={handleSubmit} className={styles.inputForm}>
-        <div className={styles.inputWrapper}>
-          <input
-            type="text"
+        {showAutocomplete && (
+          <div className={styles.autocomplete}>
+            <button
+              type="button"
+              onClick={() => handleAutocompleteClick("/요약")}
+              className={styles.autocompleteItem}
+            >
+              <span className={styles.autocompleteCommand}>/요약</span>
+              <span className={styles.autocompleteDesc}>
+                오늘 대화 요약하기
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAutocompleteClick("/리셋")}
+              className={styles.autocompleteItem}
+            >
+              <span className={styles.autocompleteCommand}>/리셋</span>
+              <span className={styles.autocompleteDesc}>대화 초기화하기</span>
+            </button>
+          </div>
+        )}
+        <div className={styles.inputRow}>
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={handleInputChange}
             onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
@@ -392,37 +425,16 @@ export default function ChatPage() {
             placeholder="메시지를 입력하세요..."
             className={styles.input}
             disabled={isLoading || summarizing}
+            rows={1}
           />
-          {showAutocomplete && (
-            <div className={styles.autocomplete}>
-              <button
-                type="button"
-                onClick={() => handleAutocompleteClick("/요약")}
-                className={styles.autocompleteItem}
-              >
-                <span className={styles.autocompleteCommand}>/요약</span>
-                <span className={styles.autocompleteDesc}>
-                  오늘 대화 요약하기
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAutocompleteClick("/리셋")}
-                className={styles.autocompleteItem}
-              >
-                <span className={styles.autocompleteCommand}>/리셋</span>
-                <span className={styles.autocompleteDesc}>대화 초기화하기</span>
-              </button>
-            </div>
-          )}
+          <button
+            type="submit"
+            disabled={isLoading || summarizing || !input.trim()}
+            className={styles.sendButton}
+          >
+            전송
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={isLoading || summarizing || !input.trim()}
-          className={styles.sendButton}
-        >
-          전송
-        </button>
       </form>
 
       {/* 리셋 확인 모달 */}

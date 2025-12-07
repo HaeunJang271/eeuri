@@ -263,21 +263,31 @@
 
 .inputForm {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   padding: 1rem;
   border-top: 1px solid #eee;
   background: #f9f9f9;
   gap: 0.5rem;
+  position: relative;
 }
 
-.inputWrapper {
+.inputRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.inputRow .input {
   flex: 1;
-  position: relative;
+}
+
+.inputRow .sendButton {
+  height: auto;
 }
 
 .input {
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 10px 1rem;
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
@@ -285,7 +295,12 @@
   background: white;
   color: #333;
   box-sizing: border-box;
-  height: 44px;
+  min-height: 44px;
+  max-height: 120px;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.5;
+  overflow-y: auto;
 }
 
 .input:focus {
@@ -309,9 +324,11 @@
   font-size: 1rem;
   font-weight: 600;
   transition: background 0.2s;
+  min-height: 44px;
   height: 44px;
   box-sizing: border-box;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sendButton:hover:not(:disabled) {
@@ -421,9 +438,9 @@
 .autocomplete {
   position: absolute;
   bottom: 100%;
-  left: 0;
-  right: 0;
-  margin-bottom: 0.5rem;
+  left: 1rem;
+  right: 1rem;
+  margin-bottom: 0;
   background: white;
   border: 1px solid #ddd;
   border-radius: 8px;
