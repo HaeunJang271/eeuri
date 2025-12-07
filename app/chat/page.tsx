@@ -29,15 +29,33 @@ function getOrCreateUserId(): string {
   return userId;
 }
 
+const DEFAULT_MESSAGE: Message = {
+  role: "assistant",
+  content:
+    '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?\n\n💡 팁: 대화를 나눈 후 "/요약"이라고 입력하면 오늘 대화를 정리해줄게.',
+};
+
+// localStorage에서 메시지 불러오기
+function loadMessages(userId: string): Message[] {
+  if (typeof window === "undefined") return [DEFAULT_MESSAGE];
+  
+  try {
+    const saved = localStorage.getItem(`eeuri_messages_${userId}`);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load messages:", error);
+  }
+  return [DEFAULT_MESSAGE];
+}
+
 export default function ChatPage() {
   const [userId] = useState(() => getOrCreateUserId());
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?\n\n💡 팁: 대화를 나눈 후 "/요약"이라고 입력하면 오늘 대화를 정리해줄게.',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([DEFAULT_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -51,6 +69,21 @@ export default function ChatPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // 초기 로드 시 localStorage에서 메시지 불러오기
+  useEffect(() => {
+    if (userId) {
+      const savedMessages = loadMessages(userId);
+      setMessages(savedMessages);
+    }
+  }, [userId]);
+
+  // 메시지 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (userId && messages.length > 0) {
+      localStorage.setItem(`eeuri_messages_${userId}`, JSON.stringify(messages));
+    }
+  }, [userId, messages]);
 
   useEffect(() => {
     scrollToBottom();
@@ -181,12 +214,7 @@ export default function ChatPage() {
       localStorage.removeItem(`eeuri_messages_${userId}`);
     }
     // 메시지를 기본 인사 메시지만 남기기
-    const defaultMessage: Message = {
-      role: "assistant",
-      content:
-        '안녕! 나는 이으리야. 네 길이 끊기지 않도록 옆에서 이어주는 존재야. 오늘 어떤 이야기를 나누고 싶어?\n\n💡 팁: 대화를 나눈 후 "/요약"이라고 입력하면 오늘 대화를 정리해줄게.',
-    };
-    setMessages([defaultMessage]);
+    setMessages([DEFAULT_MESSAGE]);
     // summary 초기화
     setSummary(null);
     setSummaryError(null);
