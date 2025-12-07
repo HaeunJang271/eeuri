@@ -296,13 +296,8 @@ export default function ChatPage() {
         ))}
         {isLoading && (
           <div className={`${styles.message} ${styles.assistant}`}>
-            <div className={`${styles.messageContent} ${styles.loadingMessage}`}>
-              <div className={styles.loadingSkeleton}>
-                <div className={styles.skeletonLine} style={{ width: "80%" }}></div>
-                <div className={styles.skeletonLine} style={{ width: "60%" }}></div>
-                <div className={styles.skeletonLine} style={{ width: "70%" }}></div>
-              </div>
-              <span className={styles.typing}>생각 중…</span>
+            <div className={styles.messageContent}>
+              <span className={styles.typing}>이으리가 생각 중..</span>
             </div>
           </div>
         )}
